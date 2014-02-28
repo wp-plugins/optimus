@@ -16,14 +16,23 @@ class Optimus_Request
 
 
 	/**
-	* Build-Optimierung für Upload-Image samt Thumbs
+	* Checking if cURL is available
+	*
+	* @var  boolean
+	*/
+
+	private static $_use_curl = false;
+
+
+	/**
+	* Build optimization for a upload image including previews
 	*
 	* @since   0.0.1
-	* @change  1.1.9
+	* @change  1.3.0
 	*
-	* @param   array    $upload_data    Array mit Upload-Informationen
+	* @param   array    $upload_data    Incoming upload information
 	* @param   integer  $attachment_id  Attachment ID
-	* @return  array    $upload_data    Array mit erneuerten Upload-Informationen
+	* @return  array    $upload_data    Renewed upload information
 	*/
 
 	public static function optimize_upload_images($upload_data, $attachment_id) {
@@ -32,17 +41,16 @@ class Optimus_Request
 			return $upload_data;
 		}
 
-		/* Upload-Ordner */
+		/* WP upload folder */
 		$upload_dir = wp_upload_dir();
 
-		/* WP-Bugfix */
+		/* Upload dir workaround */
 		if ( empty($upload_dir['subdir']) ) {
 			$upload_path = $upload_dir['path'];
 			$upload_url = $upload_dir['url'];
 			$upload_file = $upload_data['file'];
 		} else {
 			$file_info = pathinfo($upload_data['file']);
-
 			$upload_path = path_join($upload_dir['basedir'], $file_info['dirname']);
 			$upload_url = path_join($upload_dir['baseurl'], $file_info['dirname']);
 			$upload_file = $file_info['basename'];
@@ -53,28 +61,41 @@ class Optimus_Request
 			return $upload_data;
 		}
 
-		/* Attachment */
+		/* Get the attachment */
 		$attachment = get_post($attachment_id);
 
-		/* Mime Type */
+		/* Attachment mime type */
 		$mime_type = get_post_mime_type($attachment);
 
-		/* Prüfung auf Mime-Type */
+		/* Mime type check */
 		if ( ! self::_allowed_mime_type($mime_type) ) {
 			return $upload_data;
 		}
 
-		/* Optionen */
+		/* Get plugin options */
 		$options = Optimus::get_options();
 
-		/* Array mit Dateien */
+		/* Todo files array */
 		$todo_files = array($upload_file);
 
-		/* Thumbs hinzufügen */
-		if ( !empty($upload_data['sizes']) ) {
-			/* Loopen */
+		/* Diff file sizes */
+		$diff_filesizes = array();
+
+		/* Set cURL options */
+		if ( self::$_use_curl = WP_Http_Curl::test() ) {
+			add_action(
+				'http_api_curl',
+				array(
+					__CLASS__,
+					'set_curl_options'
+				)
+			);
+		}
+
+		/* Search for thumbs */
+		if ( ! empty($upload_data['sizes']) ) {
 			foreach( $upload_data['sizes'] as $thumb ) {
-				if ( self::_allowed_mime_type($thumb['mime-type']) ) {
+				if ( $thumb['file'] && self::_allowed_mime_type($thumb['mime-type']) ) {
 					array_push(
 						$todo_files,
 						$thumb['file']
@@ -82,30 +103,22 @@ class Optimus_Request
 				}
 			}
 
-			/* Umkehren */
+			/* Reverse files array */
 			$todo_files = array_reverse(
 				array_unique($todo_files)
 			);
 		}
 
-		/* Differenz */
-		$diff_filesizes = array();
-
-		/* Files loopen */
+		/* Loop todo files */
 		foreach ($todo_files as $file) {
-			/* No file? */
-			if ( empty($file) ) {
-				continue;
-			}
-
-			/* Pfad + Datei */
+			/* Merge path & file */
 			$upload_url_file = path_join($upload_url, $file);
 			$upload_path_file = path_join($upload_path, $file);
 
-			/* Dateigröße */
+			/* Get file size */
 			$upload_filesize = (int)filesize($upload_path_file);
 
-			/* Zu groß? */
+			/* Too big? */
 			if ( ! self::_allowed_file_size($mime_type, $upload_filesize) ) {
 				continue;
 			}
@@ -127,7 +140,7 @@ class Optimus_Request
 				)
 			);
 
-			/* Check */
+			/* Evaluate response */
 			switch (true) {
 				case ( is_array($action_response) ):
 					return array_merge(
@@ -155,7 +168,7 @@ class Optimus_Request
 				);
 			}
 
-		  	/* Differenz */
+		  	/* File size difference */
 		  	array_push(
 		  		$diff_filesizes,
 		  		self::_calculate_diff_filesize(
@@ -165,11 +178,11 @@ class Optimus_Request
 		  	);
 		}
 
-		/* Arrays zählen */
+		/* Count files */
 		$ordered = count($todo_files);
 		$received = count($diff_filesizes);
 
-		/* Mittelwert speichern */
+		/* Average values */
 		if ( $received ) {
 			$upload_data['optimus'] = array(
 				'profit'   => max($diff_filesizes),
@@ -182,14 +195,14 @@ class Optimus_Request
 
 
 	/**
-	* Änderung der Datei-Erweiterung
+	* Adjustment of the file extension
 	*
 	* @since   1.1.4
-	* @change  1.1.7
+	* @change  1.3.0
 	*
-	* @param   string  $file       Dateipfad
-	* @param   string  $extension  Ziel-Erweiterung
-	* @return  string              Umbenannter Dateipfad
+	* @param   string  $file       File path
+	* @param   string  $extension  Target extension
+	* @return  string              Renewed file path
 	*/
 
 	private static function _replace_file_extension($file, $extension)
@@ -203,14 +216,14 @@ class Optimus_Request
 
 
 	/**
-	* Behandlung der Bilder-Aktionen
+	* Handle image actions
 	*
 	* @since   1.1.4
-	* @change  1.2.1
+	* @change  1.3.0
 	*
-	* @param   string  $file  Dateipfad
-	* @param   array   $args  POST-Argumente
-	* @return  mixed          Fehlercodes/Dateigröße/FALSE im Fehlerfall
+	* @param   string  $file  Image file
+	* @param   array   $args  Request arguments
+	* @return  mixed          Error codes / File size
 	*/
 
 	private static function _do_image_action($file, $args)
@@ -271,27 +284,20 @@ class Optimus_Request
 
 
 	/**
-	* Start der API-Anfrage
+	* Optimus API request
 	*
 	* @since   1.1.4
-	* @change  1.1.9
+	* @change  1.3.0
 	*
-	* @param   array  $args  POST-Argumente
-	* @return  array         Array inkl. Rückgabe-Header
+	* @param   string  $file  Image file
+	* @param   array   $args  Request arguments
+	* @return  array          Response data
 	*/
 
 	private static function _do_api_request($file, $args)
 	{
-		/* cURL request */
-		if ( WP_Http_Curl::test() ) {
-			add_action(
-				'http_api_curl',
-				array(
-					__CLASS__,
-					'set_curl_options'
-				)
-			);
-
+		/* cURL Request */
+		if ( self::$_use_curl ) {
 			return wp_safe_remote_post(
 				sprintf(
 					'%s/%s?%s',
@@ -300,8 +306,8 @@ class Optimus_Request
 					self::_curl_optimus_task($args)
 				),
 				array(
-					'timeout' => 30,
-					'body'	  => file_get_contents($file)
+					'body'	  => file_get_contents($file),
+					'timeout' => 30
 				)
 			);
 		}
@@ -314,8 +320,8 @@ class Optimus_Request
 				Optimus_HQ::get_key()
 			),
 			array(
-				'timeout' => 30,
-				'body'	  => $args
+				'body'	  => $args,
+				'timeout' => 30
 			)
 		);
 	}
@@ -325,7 +331,7 @@ class Optimus_Request
 	* Set cURL request options
 	*
 	* @since   1.1.9
-	* @change  1.2.1
+	* @change  1.3.0
 	*
 	* @param   object  $handle  cURL handle with default options
 	* @return  object  $handle  cURL handle with added options
@@ -427,17 +433,17 @@ class Optimus_Request
 
 
 	/**
-	* Rückgabe der Kontingente pro Optimus Modell
+	* Return Optimus quota for a plugin type
 	*
 	* @since   1.1.0
-	* @change  1.2.1
+	* @change  1.3.0
 	*
-	* @return  array  Array mit Datensätzen
+	* @return  array  Optimus quota
 	*/
 
 	private static function _get_request_quota()
 	{
-		/* Kontingente */
+		/* Quota */
 		$quota = array(
 			/* FREE */
 			false => array(

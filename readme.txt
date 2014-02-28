@@ -79,6 +79,12 @@ NEU für Optimus HQ: Optionale [Konvertierung](https://plus.google.com/b/1144502
 
 == Changelog ==
 
+= 1.3.0 =
+* Überarbeitung der Kommunikation via cURL
+* Dokumentation der PHP-Funktionen
+* Zusätzliche Checks beim Versand und Empfang der Daten
+* Tiefgehende Code-Revision
+
 = 1.2.0 =
 * Optimierungen am Plugin-Rechtemanagement
 * Überarbeitung der Plugin-Hinweise
