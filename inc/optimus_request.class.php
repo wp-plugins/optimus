@@ -143,15 +143,6 @@ class Optimus_Request
 			/* Evaluate response */
 			if ( is_numeric($action_response) ) {
 				$response_filesize = $action_response;
-			} else if ( $action_response === NULL ) {
-				continue;
-			} else if ( is_array($action_response) ) {
-				return array_merge(
-					$upload_data,
-					array(
-						'optimus' => $action_response
-					)
-				);
 			} else {
 				return $upload_data;
 			}
@@ -215,16 +206,9 @@ class Optimus_Request
 		/* Response status code */
 		$response_code = (int)wp_remote_retrieve_response_code($response);
 
-		/* No content header */
-		if ( $response_code === 204 ) {
-			return NULL;
-		}
-
 		/* Not success status code? */
 		if ( $response_code !== 200 ) {
-			return array(
-				'error' => $response_code
-			);
+			return false;
 		}
 
 		/* Response error? */

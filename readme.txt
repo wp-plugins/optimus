@@ -81,8 +81,9 @@ NEU für Optimus HQ: Optionale [Konvertierung](https://plus.google.com/b/1144502
 
 = 1.3.0 =
 * Überarbeitung der Kommunikation via cURL
-* Dokumentation der PHP-Funktionen
 * Zusätzliche Checks beim Versand und Empfang der Daten
+* Vereinfachung der Feedback-Ausgabe in grünen Kreisen
+* Kein Abgleich der Davor-Danach-Bildgrößen für 204-Header
 * Tiefgehende Code-Revision
 
 = 1.2.0 =
