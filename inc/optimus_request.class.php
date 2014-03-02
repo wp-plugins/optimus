@@ -141,25 +141,24 @@ class Optimus_Request
 			);
 
 			/* Evaluate response */
-			switch (true) {
-				case ( is_array($action_response) ):
-					return array_merge(
-						$upload_data,
-						array(
-							'optimus' => $action_response
-						)
-					);
-
-				case ( $action_response === false ):
-					return $upload_data;
-
-				default:
-					$response_filesize = $action_response;
+			if ( is_numeric($action_response) ) {
+				$response_filesize = $action_response;
+			} else if ( $action_response === NULL ) {
+				continue;
+			} else if ( is_array($action_response) ) {
+				return array_merge(
+					$upload_data,
+					array(
+						'optimus' => $action_response
+					)
+				);
+			} else {
+				return $upload_data;
 			}
 
 			/* Request: WebP convert */
 			if ( $options['webp_convert'] && Optimus_HQ::is_unlocked() ) {
-				$action_response = self::_do_image_action(
+				self::_do_image_action(
 					$upload_path_file,
 					array(
 						'file' => $upload_url_file_encoded,
@@ -195,27 +194,6 @@ class Optimus_Request
 
 
 	/**
-	* Adjustment of the file extension
-	*
-	* @since   1.1.4
-	* @change  1.3.0
-	*
-	* @param   string  $file       File path
-	* @param   string  $extension  Target extension
-	* @return  string              Renewed file path
-	*/
-
-	private static function _replace_file_extension($file, $extension)
-	{
-		return substr_replace(
-			$file,
-			$extension,
-			strlen(pathinfo($file, PATHINFO_EXTENSION)) * -1
-		);
-	}
-
-
-	/**
 	* Handle image actions
 	*
 	* @since   1.1.4
@@ -223,7 +201,10 @@ class Optimus_Request
 	*
 	* @param   string  $file  Image file
 	* @param   array   $args  Request arguments
-	* @return  mixed          Error codes / File size
+	* @return  array          Request failed with an error code
+	* @return  false          An error has occurred
+	* @return  null           Empty response with 204 status code
+	* @return  intval         Response content length
 	*/
 
 	private static function _do_image_action($file, $args)
@@ -236,7 +217,7 @@ class Optimus_Request
 
 		/* No content header */
 		if ( $response_code === 204 ) {
-			return false;
+			return NULL;
 		}
 
 		/* Not success status code? */
@@ -254,7 +235,7 @@ class Optimus_Request
 		/* Response properties */
 		$response_body = wp_remote_retrieve_body($response);
 		$response_type = wp_remote_retrieve_header($response, 'content-type');
-		$response_length = wp_remote_retrieve_header($response, 'content-length');
+		$response_length = (int)wp_remote_retrieve_header($response, 'content-length');
 
 		/* Empty file? */
 		if ( empty($response_body) OR empty($response_type) OR empty($response_length) ) {
@@ -267,7 +248,7 @@ class Optimus_Request
 		}
 
 		/* Extension replace for WebP */
-		if ( ! empty($args['webp']) ) {
+		if ( isset($args['webp']) ) {
 			$file = self::_replace_file_extension(
 				$file,
 				'webp'
@@ -374,6 +355,27 @@ class Optimus_Request
 		}
 
 		return 'optimize';
+	}
+
+
+	/**
+	* Adjustment of the file extension
+	*
+	* @since   1.1.4
+	* @change  1.3.0
+	*
+	* @param   string  $file       File path
+	* @param   string  $extension  Target extension
+	* @return  string              Renewed file path
+	*/
+
+	private static function _replace_file_extension($file, $extension)
+	{
+		return substr_replace(
+			$file,
+			$extension,
+			strlen(pathinfo($file, PATHINFO_EXTENSION)) * -1
+		);
 	}
 
 
