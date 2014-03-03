@@ -42,6 +42,7 @@ NEU für Optimus HQ: Optionale [Konvertierung](https://plus.google.com/b/1144502
 * Verkleinerung der Dateigröße ohne Verlust der Qualität
 * Optimierung aller Vorschauvarianten eines Bildes
 * Keine Code-Anpassungen notwendig
+* Option: HTTPS-Verbindung für die Bildübertragung
 * Option: Keine Entfernung von EXIF- und IPTC-Metadaten
 * Option: Konvertierung ins WebP-Bildformat (Optimus HQ)
 * Optimiert für WordPress Mobile Apps und Windows Live Writer
@@ -80,10 +81,12 @@ NEU für Optimus HQ: Optionale [Konvertierung](https://plus.google.com/b/1144502
 == Changelog ==
 
 = 1.3.0 =
+* Implementierung von HTTPS-Verbindungen
 * Überarbeitung der Kommunikation via cURL
 * Zusätzliche Checks beim Versand und Empfang der Daten
 * Vereinfachung der Feedback-Ausgabe in grünen Kreisen
 * Kein Abgleich der Davor-Danach-Bildgrößen für 204-Header
+* Connection-Timeout auf 10 Sekunden
 * Tiefgehende Code-Revision
 
 = 1.2.0 =

@@ -16,12 +16,21 @@ class Optimus_Request
 
 
 	/**
-	* Checking if cURL is available
+	* cURL is available
 	*
 	* @var  boolean
 	*/
 
 	private static $_use_curl = false;
+
+
+	/**
+	* Default remote scheme
+	*
+	* @var  string
+	*/
+
+	private static $_remote_scheme = 'http';
 
 
 	/**
@@ -90,6 +99,11 @@ class Optimus_Request
 					'set_curl_options'
 				)
 			);
+		}
+
+		/* Set https scheme */
+		if ( $options['secure_transport'] && Optimus_HQ::is_unlocked() ) {
+			self::$_remote_scheme = 'https';
 		}
 
 		/* Search for thumbs */
@@ -265,14 +279,14 @@ class Optimus_Request
 		if ( self::$_use_curl ) {
 			return wp_safe_remote_post(
 				sprintf(
-					'%s/%s?%s',
-					'http://magic.optimus.io',
+					'%s://magic.optimus.io/%s?%s',
+					self::$_remote_scheme,
 					Optimus_HQ::get_key(),
 					self::_curl_optimus_task($args)
 				),
 				array(
 					'body'	  => file_get_contents($file),
-					'timeout' => 30
+					'timeout' => 10
 				)
 			);
 		}
@@ -280,13 +294,13 @@ class Optimus_Request
 		/* Fallback request */
 		return wp_safe_remote_post(
 			sprintf(
-				'%s/%s',
-				'http://api.optimus.io',
+				'%s://api.optimus.io/%s',
+				self::$_remote_scheme,
 				Optimus_HQ::get_key()
 			),
 			array(
 				'body'	  => $args,
-				'timeout' => 30
+				'timeout' => 10
 			)
 		);
 	}
