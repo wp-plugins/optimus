@@ -2,7 +2,7 @@
 Contributors: sergej.mueller
 Tags: images, optimize, compress, smushit, webp
 Requires at least: 3.8
-Tested up to: 3.8
+Tested up to: 3.9
 Stable tag: trunk
 License: GPLv2 or later
 License URI: http://www.gnu.org/licenses/gpl-2.0.html
@@ -42,8 +42,8 @@ NEU für Optimus HQ: Optionale [Konvertierung](https://plus.google.com/b/1144502
 * Verkleinerung der Dateigröße ohne Verlust der Qualität
 * Optimierung aller Vorschauvarianten eines Bildes
 * Keine Code-Anpassungen notwendig
-* Option: HTTPS-Verbindung für die Bildübertragung
 * Option: Keine Entfernung von EXIF- und IPTC-Metadaten
+* Option: HTTPS-Verbindung für die Bildübertragung (Optimus HQ)
 * Option: Konvertierung ins WebP-Bildformat (Optimus HQ)
 * Optimiert für WordPress Mobile Apps und Windows Live Writer
 * Vorteilhafterer PageSpeed als Ranking-Faktor
@@ -81,8 +81,8 @@ NEU für Optimus HQ: Optionale [Konvertierung](https://plus.google.com/b/1144502
 == Changelog ==
 
 = 1.3.0 =
-* Implementierung von HTTPS-Verbindungen
 * Überarbeitung der Kommunikation via cURL
+* Implementierung von HTTPS (Optimus HQ)
 * Zusätzliche Checks beim Versand und Empfang der Daten
 * Vereinfachung der Feedback-Ausgabe in grünen Kreisen
 * Kein Abgleich der Davor-Danach-Bildgrößen für 204-Header
