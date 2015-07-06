@@ -67,10 +67,10 @@ class Optimus
 
 		/* Hooks */
 		add_action(
-			'admin_print_styles-upload.php',
+			'admin_enqueue_scripts',
 			array(
-				'Optimus_Media',
-				'add_css'
+				__CLASS__,
+				'add_js_css'
 			)
 		);
 		add_filter(
@@ -89,7 +89,6 @@ class Optimus
 			10,
 			2
 		);
-
 		add_filter(
 			'plugin_row_meta',
 			array(
@@ -127,11 +126,19 @@ class Optimus
 				'register_settings'
 			)
 		);
+
 		add_action(
 			'admin_menu',
 			array(
 				'Optimus_Settings',
 				'add_page'
+			)
+		);
+		add_action(
+			'admin_menu',
+			array(
+				'Optimus_Management',
+				'add_bulk_optimizer_page'
 			)
 		);
 
@@ -150,7 +157,9 @@ class Optimus
 				'optimus_hq_notice'
 			)
 		);
+
 	}
+
 
 
 	/**
@@ -181,7 +190,7 @@ class Optimus
 						),
 						admin_url('options-general.php')
 					),
-					__('Settings')
+					__("Settings")
 				)
 			)
 		);
@@ -223,7 +232,7 @@ class Optimus
 						),
 						network_admin_url('plugins.php#_optimus_key')
 					),
-					( Optimus_HQ::get_key() ? 'Anderen Optimus HQ Key eingeben' : '<span style="color:#006505">Optimus HQ aktivieren</span>' )
+					( Optimus_HQ::get_key() ? __("Enter a different Optimus HQ license key", "optimus") : '<span style="color:#006505">'.__("Activate Optimus HQ", "optimus").'</span>' )
 				)
 			)
 		);
@@ -234,7 +243,7 @@ class Optimus
 				$rows,
 				array(
 					sprintf(
-						'Optimus HQ Ablaufdatum: %s',
+						__("Optimus HQ expiry date: %s", "optimus"),
 						date( 'd.m.Y', Optimus_HQ::best_before() )
 					)
 				)
@@ -290,7 +299,7 @@ class Optimus
 				sprintf(
 					'<div class="error"><p>%s</p></div>',
 					sprintf(
-						'Optimus ist für WordPress %s optimiert. Bitte das Plugin deaktivieren oder WordPress aktualisieren (empfohlen).',
+						__("Optimus is optimized for WordPress %s. Please disable the plugin or upgrade your WordPress installation (recommended).", "optimus"),
 						OPTIMUS_MIN_WP
 					)
 				)
@@ -303,8 +312,8 @@ class Optimus
 				sprintf(
 					'<div class="error"><p>%s</p></div>',
 					sprintf(
-						'Optimus setzt <a href="%s" target="_blank">cURL-Bibliothek</a> voraus (sollte auf keinem Server fehlen). Bitte beim Hoster anfragen.',
-						'https://php.net/manual/de/intro.curl.php'
+						__("Optimus requires the <a href=\"%s\" target=\"_blank\">cURL-Library</a>. Please contact your hosting provider to get cURL installed.", "optimus"),
+						'https://php.net/manual/en/intro.curl.php'
 					)
 				)
 			);
@@ -332,5 +341,38 @@ class Optimus
 				'secure_transport'	=> 0
 			)
 		);
+	}
+
+
+	/**
+	* Hinzufügen von JavaScript und Styles
+	*
+	* @since   1.3.8
+	* @change  1.3.8
+	*/
+	public static function add_js_css()
+	{
+		wp_register_style(
+			'optimus-styles',
+			plugins_url(
+				'css/styles.css',
+				OPTIMUS_FILE
+			)
+		);
+		wp_enqueue_style('optimus-styles');
+
+		$handle = 'optimus-scripts';
+
+		wp_register_script( $handle, plugins_url('js/scripts.js', OPTIMUS_FILE), array('jquery'), TRUE );
+		wp_localize_script($handle, 'optimusOptimize', array(
+			'nonce' => wp_create_nonce('optimus-optimize'),
+			'bulkDone' => __("All images have been optimized.", "optimus"),
+			'bulkAction' => __("Optimize images", "optimus"),
+			'optimizing' => __("Optimizing", "optimus"),
+			'optimized' => __("optimized", "optimus"),
+			'internalError' => __("Internal error", "optimus"),
+			'waiting' => __("Waiting", "optimus"),
+		));
+		wp_enqueue_script($handle);
 	}
 }
