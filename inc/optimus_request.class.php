@@ -9,6 +9,7 @@ defined('ABSPATH') OR exit;
 * Optimus_Request
 *
 * @since 1.1.7
+* @change  1.4.0
 */
 
 class Optimus_Request
@@ -16,12 +17,72 @@ class Optimus_Request
 
 
 	/**
-	* Default remote scheme
+	* Optimize image
 	*
 	* @var  string
 	*/
 
 	private static $_remote_scheme = 'http';
+
+
+	/**
+	* Image optimization post process (ajax)
+	*
+	* @since   1.3.8
+	* @change  1.3.8
+	*
+	* @return  json    $metadata    Update metadata information
+	*/
+
+	public static function optimize_image() {
+		if (!check_ajax_referer('optimus-optimize', '_nonce', false)) {
+			exit();
+		}
+
+		/* check if valid request */
+		if (empty($_POST['id'])) {
+			$message = __("Invalid request", "optimus");
+			echo json_encode(array('error' => $message));
+			exit();
+		}
+		$id = intval($_POST['id']);
+
+		/* check user permission */
+		if (!current_user_can('upload_files')) {
+			$message = __("Permission missing (upload_files)", "optimus");
+			echo json_encode(array('error' => $message));
+			exit();
+		}
+
+		/* get metadata */
+		$metadata = wp_get_attachment_metadata($id);
+		if (!is_array($metadata)) {
+			$message = __("Metadata missing", "optimus");
+			echo json_encode(array('error' => $message));
+			exit;
+		}
+
+		/* check if already optimized */
+		if (isset($metadata['optimus'])) {
+			$message = __("Already optimized", "optimus");
+			echo json_encode(array('info' => $message));
+			exit;
+		}
+
+		/* optimize image */
+		$optimus_metadata = self::optimize_upload_images($metadata, $id);
+
+		if (!empty($optimus_metadata['optimus']['error'])) {
+			echo json_encode(array('error' => $optimus_metadata['optimus']['error']));
+			exit;
+		}
+
+		/* update metadata */
+		update_post_meta($id, '_wp_attachment_metadata', $optimus_metadata);
+
+		echo json_encode($optimus_metadata);
+		exit;
+	}
 
 
 	/**
@@ -73,6 +134,7 @@ class Optimus_Request
 
 		/* Simple regex check */
 		if ( ! preg_match('/^[^\?\%]+\.(?:jpe?g|png)$/i', $upload_file) ) {
+			$upload_data['optimus']['error'] = __("Format not supported", "optimus");
 			return $upload_data;
 		}
 
@@ -84,6 +146,7 @@ class Optimus_Request
 
 		/* Mime type check */
 		if ( ! self::_allowed_mime_type($mime_type) ) {
+			$upload_data['optimus']['error'] = __("Mime type not supported", "optimus");
 			return $upload_data;
 		}
 
@@ -173,6 +236,8 @@ class Optimus_Request
 			if ( is_numeric($action_response) ) {
 				$response_filesize = $action_response;
 			} else {
+				// return error message
+				$upload_data['optimus']['error'] = $action_response;
 				return $upload_data;
 			}
 
@@ -237,12 +302,12 @@ class Optimus_Request
 
 		/* Not success status code? */
 		if ( $response_code !== 200 ) {
-			return false;
+			return 'code '.$response_code;
 		}
 
 		/* Response error? */
 		if ( is_wp_error($response) ) {
-			return false;
+			return get_error_message($response);
 		}
 
 		/* Response properties */
@@ -252,12 +317,12 @@ class Optimus_Request
 
 		/* Empty file? */
 		if ( empty($response_body) OR empty($response_type) OR empty($response_length) ) {
-			return false;
+			return __("File empty", "optimus");
 		}
 
 		/* Mime type check */
 		if ( ! self::_allowed_mime_type($response_type) ) {
-			return false;
+			return __("Mime type not supported", "optimus");
 		}
 
 		/* Extension replace for WebP */
@@ -270,7 +335,7 @@ class Optimus_Request
 
 		/* Rewrite image file */
 		if ( ! file_put_contents($file, $response_body) ) {
-			return false;
+			return __("Write operation failed", "optimus");
 		}
 
 		return $response_length;
@@ -437,7 +502,7 @@ class Optimus_Request
 	* Return Optimus quota for a plugin type
 	*
 	* @since   1.1.0
-	* @change  1.3.5
+	* @change  1.4.0
 	*
 	* @return  array  Optimus quota
 	*/
@@ -448,14 +513,15 @@ class Optimus_Request
 		$quota = array(
 			/* Optimus */
 			false => array(
-				'image/jpeg' => 20 * 1024
+				'image/jpeg' => 100 * 1024,
+				'image/png'  => 100 * 1024
 			),
 
 			/* Optimus HQ */
 			true => array(
-				'image/jpeg' => 1000 * 1024,
-				'image/webp' => 1000 * 1024,
-				'image/png'  => 500  * 1024
+				'image/jpeg' => 5000 * 1024,
+				'image/webp' => 5000 * 1024,
+				'image/png'  => 5000 * 1024
 			)
 		);
 
