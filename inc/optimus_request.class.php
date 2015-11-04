@@ -9,6 +9,7 @@ defined('ABSPATH') OR exit;
 * Optimus_Request
 *
 * @since 1.1.7
+* @change  1.4.0
 */
 
 class Optimus_Request
@@ -16,7 +17,7 @@ class Optimus_Request
 
 
 	/**
-	* Default remote scheme
+	* Optimize image
 	*
 	* @var  string
 	*/
@@ -25,10 +26,69 @@ class Optimus_Request
 
 
 	/**
+	* Image optimization post process (ajax)
+	*
+	* @since   1.3.8
+	* @change  1.4.2
+	*
+	* @return  json    $metadata    Update metadata information
+	*/
+
+	public static function optimize_image() {
+		if (!check_ajax_referer('optimus-optimize', '_nonce', false)) {
+			exit();
+		}
+
+		/* check if valid request */
+		if (empty($_POST['id'])) {
+			$message = __("Invalid request", "optimus");
+			echo json_encode(array('error' => $message));
+			exit();
+		}
+		$id = intval($_POST['id']);
+
+		/* check user permission */
+		if (!current_user_can('upload_files')) {
+			$message = __("Permission missing (upload_files)", "optimus");
+			echo json_encode(array('error' => $message));
+			exit();
+		}
+
+		/* get metadata */
+		$metadata = wp_get_attachment_metadata($id);
+		if (!is_array($metadata)) {
+			$message = __("Metadata missing", "optimus");
+			echo json_encode(array('error' => $message));
+			exit;
+		}
+
+		/* optimize image */
+		$optimus_metadata = self::optimize_upload_images($metadata, $id);
+
+		if ( !empty($optimus_metadata['optimus']['error']) ) {
+			echo json_encode(array('error' => $optimus_metadata['optimus']['error']));
+			exit;
+		}
+
+		/* check if optimus array empty */
+		if ( empty($optimus_metadata['optimus']) ) {
+			echo json_encode(array('error' => __("Internal error", "optimus")));
+			exit;
+		}
+
+		/* update metadata */
+		update_post_meta($id, '_wp_attachment_metadata', $optimus_metadata);
+
+		echo json_encode($optimus_metadata);
+		exit;
+	}
+
+
+	/**
 	* Build optimization for a upload image including previews
 	*
 	* @since   0.0.1
-	* @change  1.3.6
+	* @change  1.4.2
 	*
 	* @param   array    $upload_data    Incoming upload information
 	* @param   integer  $attachment_id  Attachment ID
@@ -36,8 +96,11 @@ class Optimus_Request
 	*/
 
 	public static function optimize_upload_images($upload_data, $attachment_id) {
+		/* Get plugin options */
+		$options = Optimus::get_options();
+
 		/* Already optimized? */
-		if ( ! empty($upload_data['optimus']) ) {
+		if ( ( ! empty($upload_data['optimus']) && $options['webp_convert'] == 0 ) || ( ! empty($upload_data['optimus']['webp']) && $upload_data['optimus']['webp'] == 1 ) ) {
 			return $upload_data;
 		}
 
@@ -73,6 +136,7 @@ class Optimus_Request
 
 		/* Simple regex check */
 		if ( ! preg_match('/^[^\?\%]+\.(?:jpe?g|png)$/i', $upload_file) ) {
+			$upload_data['optimus']['error'] = __("Format not supported", "optimus");
 			return $upload_data;
 		}
 
@@ -84,11 +148,9 @@ class Optimus_Request
 
 		/* Mime type check */
 		if ( ! self::_allowed_mime_type($mime_type) ) {
+			$upload_data['optimus']['error'] = __("Mime type not supported", "optimus");
 			return $upload_data;
 		}
-
-		/* Get plugin options */
-		$options = Optimus::get_options();
 
 		/* Init arrays */
 		$todo_files = array();
@@ -119,7 +181,7 @@ class Optimus_Request
 		/* Search for thumbs */
 		if ( ! empty($upload_data['sizes']) ) {
 			foreach( $upload_data['sizes'] as $thumb ) {
-				if ( $thumb['file'] && self::_allowed_mime_type($thumb['mime-type']) ) {
+				if ( $thumb['file'] && ( empty($thumb['mime-type']) || self::_allowed_mime_type($thumb['mime-type']) ) ) {
 					array_push(
 						$todo_files,
 						$thumb['file']
@@ -173,6 +235,8 @@ class Optimus_Request
 			if ( is_numeric($action_response) ) {
 				$response_filesize = $action_response;
 			} else {
+				// return error message
+				$upload_data['optimus']['error'] = $action_response;
 				return $upload_data;
 			}
 
@@ -205,7 +269,8 @@ class Optimus_Request
 		if ( $received ) {
 			$upload_data['optimus'] = array(
 				'profit'   => max($diff_filesizes),
-				'quantity' => round( $received * 100 / $ordered )
+				'quantity' => round( $received * 100 / $ordered ),
+				'webp'	   => $options['webp_convert']
 			);
 		}
 
@@ -237,12 +302,12 @@ class Optimus_Request
 
 		/* Not success status code? */
 		if ( $response_code !== 200 ) {
-			return false;
+			return 'code '.$response_code;
 		}
 
 		/* Response error? */
 		if ( is_wp_error($response) ) {
-			return false;
+			return get_error_message($response);
 		}
 
 		/* Response properties */
@@ -252,12 +317,12 @@ class Optimus_Request
 
 		/* Empty file? */
 		if ( empty($response_body) OR empty($response_type) OR empty($response_length) ) {
-			return false;
+			return __("File empty", "optimus");
 		}
 
 		/* Mime type check */
 		if ( ! self::_allowed_mime_type($response_type) ) {
-			return false;
+			return __("Mime type not supported", "optimus");
 		}
 
 		/* Extension replace for WebP */
@@ -270,7 +335,7 @@ class Optimus_Request
 
 		/* Rewrite image file */
 		if ( ! file_put_contents($file, $response_body) ) {
-			return false;
+			return __("Write operation failed", "optimus");
 		}
 
 		return $response_length;
@@ -437,7 +502,7 @@ class Optimus_Request
 	* Return Optimus quota for a plugin type
 	*
 	* @since   1.1.0
-	* @change  1.3.5
+	* @change  1.4.0
 	*
 	* @return  array  Optimus quota
 	*/
@@ -448,14 +513,15 @@ class Optimus_Request
 		$quota = array(
 			/* Optimus */
 			false => array(
-				'image/jpeg' => 20 * 1024
+				'image/jpeg' => 100 * 1024,
+				'image/png'  => 100 * 1024
 			),
 
 			/* Optimus HQ */
 			true => array(
-				'image/jpeg' => 1000 * 1024,
-				'image/webp' => 1000 * 1024,
-				'image/png'  => 500  * 1024
+				'image/jpeg' => 5000 * 1024,
+				'image/webp' => 5000 * 1024,
+				'image/png'  => 5000 * 1024
 			)
 		);
 
