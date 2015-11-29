@@ -1,16 +1,17 @@
 <?php
 /*
 Plugin Name: Optimus
-Description: Verlustfreie Komprimierung der Upload-Bilder in WordPress. Automatisch, zuverlässig, wirkungsvoll.
-Author: Sergej M&uuml;ller
-Author URI: http://wpcoder.de
+Text Domain: optimus
+Description: Lossless compression and optimization of uploaded images in WordPress. Automatic, reliable, effective.
+Author: KeyCDN
+Author URI: https://www.keycdn.com
 Plugin URI: https://optimus.io
 License: GPLv2 or later
-Version: 1.3.6
+Version: 1.4.3
 */
 
 /*
-Copyright (C)  2012-2015 Sergej Müller
+Copyright (C)  2012-2015 KeyCDN
 
 This program is free software; you can redistribute it and/or modify
 it under the terms of the GNU General Public License as published by
@@ -37,6 +38,31 @@ define('OPTIMUS_FILE', __FILE__);
 define('OPTIMUS_DIR', dirname(__FILE__));
 define('OPTIMUS_BASE', plugin_basename(__FILE__));
 define('OPTIMUS_MIN_WP', '3.8');
+
+
+/* Hook admin init */
+add_action('init', 'admin_init');
+function admin_init()
+{
+	if (is_admin()) {
+		load_plugin_textdomain( 'optimus', false, dirname( plugin_basename(__FILE__) ) . '/lang/' );
+
+		add_action(
+			'wp_ajax_optimus_optimize_image',
+			array(
+				'Optimus_Request',
+				'optimize_image'
+			)
+		);
+		add_action(
+			'admin_action_optimus_bulk_optimizer',
+			array(
+				'Optimus_Management',
+				'bulk_optimizer_media'
+			)
+		);
+	}
+}
 
 
 /* Admin & XMLRPC only */
@@ -76,7 +102,7 @@ spl_autoload_register('optimus_autoload');
 
 /* Autoload Funktion */
 function optimus_autoload($class) {
-	if ( in_array($class, array('Optimus', 'Optimus_HQ', 'Optimus_Settings', 'Optimus_Media', 'Optimus_Request')) ) {
+	if ( in_array($class, array('Optimus', 'Optimus_HQ', 'Optimus_Management', 'Optimus_Settings', 'Optimus_Media', 'Optimus_Request')) ) {
 		require_once(
 			sprintf(
 				'%s/inc/%s.class.php',
